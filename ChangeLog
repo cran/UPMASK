@@ -1,8 +1,16 @@
 
+1.2
+
+* Updated to include the possibility to adopt Laplacian Eigenmaps as the dimensionality reduction method, following "A formulation of stellar cluster membership assignment as a distance geometry problem" by Bezerra, E.; de Lima, L.; Krone-Martins, A., In Proceedings of the Workshop on Distance Geometry and Applications 2013, p. 83  (Eds. A. Andrioni, R. de Freitas, C. Lavor, L. Liberti, N. Maculan, A. Mucherino), Manaus, Brazil. June, 2013.
+* Updated to include the possibility to bypass the dimensionality reduction step (for instance to use astrometric data) as adopted in "Gaia DR2 unravels incompleteness of nearby cluster population: New open clusters in the direction of Perseus", Cantat-Gaudin et al. arXiv:1810.05494, and "A Gaia DR2 view of the open cluster population in the Milky Way", Cantat-Gaudin et al., Astronomy & Astrophysics, Volume 618, id.A93, 2018.
+* Updated to correct two bugs that prevented some columns to be automatically propagated from the calling function to the outer loop function, and another small bug that forced the user to have columns explicitly named. Thanks to Ana Sofia Chagas Carvalho, Antonio da Silva and Manuel da Silva for originally helping to notice and track the bug. This bug was also independently reported by Laia Casamiquela and Laura Paraizo.
+* Updated the innerLoop, outerLoop and UPMASKdata functions to use nrow() in replacement of length().
+* Updated the innerLoop and outerLoop functions to allow an user selectable number of dimensions to be considered after the dimensionality reduction step. 
+
 1.1
 
 * Updated to correct some NOTES issued during the automated R tests. 
 
 1.0
 
-* First release in CRAN
+* First release in CRAN.

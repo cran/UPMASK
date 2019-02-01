@@ -39,6 +39,9 @@
 #' @param considerErrors a boolean indicating if the errors should be taken into account
 #' @param finalXYCut a boolean indicating if a final cut in the XY space should be performed (defaults to FALSE)
 #' @param fileWithHeader a boolean indicating if the input file has a text header
+#' @param nDimsToKeep an integer with the number of dimensions to consider (defaults to 4)
+#' @param dimRed a string with the dimensionality reduction method to use (defaults to PCA. The only other options are LaplacianEigenmaps or None)
+#' @param scale a boolean indicating if the data should be scaled and centered
 #' 
 #' @references \href{http://dx.doi.org/10.1051/0004-6361/201321143}{Krone-Martins, A. & Moitinho, A., A&A, v.561, p.A57, 2014}
 #'
@@ -74,7 +77,8 @@
 #' photometricErrorDataIndexes=c(4,6,8,10,12,20,22,24,26,28), threshold=1, 
 #' maxIter=20, starsPerClust_kmeans=50, nstarts_kmeans=50, nRuns=5, 
 #' runInParallel=FALSE, paralelization="multicore", independent=TRUE, verbose=FALSE, 
-#' autoCalibrated=FALSE, considerErrors=FALSE, finalXYCut=FALSE, fileWithHeader=FALSE)
+#' autoCalibrated=FALSE, considerErrors=FALSE, finalXYCut=FALSE, 
+#' fileWithHeader=FALSE, nDimsToKeep=4, dimRed="PCA", scale=TRUE)
 #' 
 #' @author Alberto Krone-Martins, Andre Moitinho
 #' 
@@ -86,9 +90,10 @@ UPMASKfile <- function(filenameWithPathInput, filenameWithPathOuput,
 					  photometricDataIndexes=c(3,5,7,9,11,19,21,23,25,27),
 					  photometricErrorDataIndexes=c(4,6,8,10,12,20,22,24,26,28),
 					  threshold=1, maxIter=20, starsPerClust_kmeans=50, nstarts_kmeans=50, 
-                      nRuns=5, runInParallel=FALSE, paralelization="multicore", 
-                      independent=TRUE, verbose=FALSE, autoCalibrated=FALSE, 
-                      considerErrors=FALSE, finalXYCut=FALSE, fileWithHeader=FALSE) {
+            nRuns=5, runInParallel=FALSE, paralelization="multicore", 
+            independent=TRUE, verbose=FALSE, autoCalibrated=FALSE, 
+            considerErrors=FALSE, finalXYCut=FALSE, fileWithHeader=FALSE, 
+					  nDimsToKeep=4, dimRed="PCA", scale=TRUE) {
   
   # 
   # User :: Interface
@@ -117,14 +122,15 @@ UPMASKfile <- function(filenameWithPathInput, filenameWithPathOuput,
   #
   resultsTable <- UPMASKdata(ocdata_full, 
   					  positionDataIndexes=positionDataIndexes,
-					  photometricDataIndexes=photometricDataIndexes,
-					  photometricErrorDataIndexes=photometricErrorDataIndexes,
-					  threshold=threshold, maxIter=maxIter, 
-                      starsPerClust_kmeans=starsPerClust_kmeans, 
-                      nstarts_kmeans=nstarts_kmeans, nRuns=nRuns, 
-                      runInParallel=runInParallel, paralelization=paralelization, 
-                      independent=independent, verbose=verbose, 
-                      considerErrors=considerErrors, finalXYCut=finalXYCut)
+					    photometricDataIndexes=photometricDataIndexes,
+					    photometricErrorDataIndexes=photometricErrorDataIndexes,
+					    threshold=threshold, maxIter=maxIter, 
+              starsPerClust_kmeans=starsPerClust_kmeans, 
+              nstarts_kmeans=nstarts_kmeans, nRuns=nRuns, 
+              runInParallel=runInParallel, paralelization=paralelization, 
+              independent=independent, verbose=verbose, 
+              considerErrors=considerErrors, finalXYCut=finalXYCut, 
+					    nDimsToKeep=nDimsToKeep, dimRed=dimRed, scale=scale)
   
   # 
   # Data I/O :: Perform File Output

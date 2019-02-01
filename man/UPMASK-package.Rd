@@ -19,8 +19,8 @@ An implementation of the UPMASK method for performing membership
 \tabular{ll}{
 Package: \tab UPMASK\cr
 Type: \tab Package\cr
-Version: \tab 1.0\cr
-Date: \tab 2014-09-11\cr
+Version: \tab 1.2\cr
+Date: \tab 2017-06-09\cr
 License: \tab GPL (>= 3)\cr
 }
 

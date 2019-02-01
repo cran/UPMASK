@@ -38,6 +38,10 @@
 #' @param stopIfEmpty a boolean indicating if the code should completely stop if no spatial clustering is detected (defaults to FALSE)
 #' @param positionDataIndexes an array of integers indicating the columns of the data frame containing the spatial position measurements
 #' @param smartTableDB a database connection to the smart look-up table
+#' @param nDimsToKeep an integer with the number of dimensions to consider (defaults to 4)
+#' @param dimRed a string with the dimensionality reduction method to use (defaults to PCA. The only other options are LaplacianEigenmaps or None)
+#' @param scale a boolean indicating if the data should be scaled and centered
+#' 
 #'
 #' @return A data frame with objects considered as members at this iteration.
 #'
@@ -75,7 +79,7 @@
 #' @usage innerLoop(ocdata_full, ocdata, classAlgol="kmeans", autoThresholdLevel=3, 
 #' autoThreshold=TRUE, iiter=0, plotIter=FALSE, verbosity=1, starsPerClust_kmeans=50, 
 #' nstarts_kmeans=50, runId=0, autoCalibrated=FALSE, stopIfEmpty=FALSE, 
-#' positionDataIndexes=c(1,2), smartTableDB)
+#' positionDataIndexes=c(1,2), smartTableDB, nDimsToKeep=4, dimRed="PCA", scale=TRUE)
 #' 
 #' @author Alberto Krone-Martins, Andre Moitinho
 #' 
@@ -86,28 +90,68 @@ innerLoop <- function(ocdata_full, ocdata, classAlgol="kmeans", autoThresholdLev
                          autoThreshold=TRUE, iiter=0, plotIter=FALSE, verbosity=1, 
                          starsPerClust_kmeans=50, nstarts_kmeans=50, runId=0, 
                          autoCalibrated=FALSE, stopIfEmpty=FALSE, 
-                         positionDataIndexes=c(1,2), smartTableDB) {
+                         positionDataIndexes=c(1,2), smartTableDB, nDimsToKeep=4, dimRed="PCA", scale=TRUE) {
   if(verbosity!=0) {
     cat(paste(" [runId:",runId,"] ITERATION:",iiter," RUNNING...\n"))
   }
   inSize <- length(ocdata_full)
   
-  # Perform a PCA
-  if(verbosity>=1) {
-    cat(paste(" [runId:",runId,"] ITERATION:",iiter," -- [1/3] Performing PCA...\n"))
+  # Perform the dimensionality reduction step
+  if(dimRed!="None") {
+    if(verbosity>=1) {
+      cat(paste(" [runId:",runId,"] ITERATION:",iiter," -- [1/3] Performing Dimensionality Reduction...\n"))
+    }
+    if(dimRed=="PCA") {
+      if(verbosity>=1) {
+        cat(paste(" [runId:",runId,"] ITERATION:",iiter," --       Using PCA...\n"))
+      }
+      ocdata_pca <- prcomp(ocdata, scale=scale, center=scale, cor=TRUE)
+      ocdata_px <- predict(ocdata_pca)
+    } else 
+    if(dimRed=="LaplacianEigenmaps") {
+      minPoints <- round(runif(1, min=5, max=starsPerClust_kmeans))
+      if(starsPerClust_kmeans > 25) {
+        minPoints <- round(runif(1, min=5, max=25))
+      } 
+      if(nrow(ocdata) <= minPoints) {
+        minPoints <- round(nrow(ocdata) - 1)
+      }
+      if(verbosity>=1) {
+        cat(paste(" [runId:",runId,"] ITERATION:",iiter," --       Using Laplacian Eigenmaps... pts =",minPoints," Data=",nrow(ocdata),"\n"))
+      }
+      leim <- dimRed::LaplacianEigenmaps()
+      leim@stdpars$ndim <- nDimsToKeep
+      leim@stdpars$knn <- minPoints
+      if(scale==TRUE) {
+        ocemb <- leim@fun(dimRed::dimRedData(scale(ocdata)), leim@stdpars)
+      } else {
+        ocemb <- leim@fun(dimRed::dimRedData(ocdata), leim@stdpars)
+      }
+      ocdata_px <- as.data.frame(ocemb@data@data)
+    } else {
+      stop("You should select PCA, LaplacianEigenmaps as the dimensionality reduction method, or implement your own. Alternatively, you can select None to ignore dimensionality reduction.")
+    }
+  } else {
+    if(verbosity>=1) {
+      cat(paste(" [runId:",runId,"] ITERATION:",iiter," -- [1/3] You have chosen not to perform dimensionality reduction...\n"))
+    }
+    if(scale==TRUE) {
+      ocdata_px <- scale(ocdata)
+    } else {
+      ocdata_px <- ocdata
+    }
   }
-  ocdata_pca <- prcomp(ocdata, scale=TRUE, center=TRUE, cor=TRUE)
-  ocdata_px <- predict(ocdata_pca)
+  #########
   
-  # Perform the clustering
+  # Perform the clustering step
   if (classAlgol=="kmeans") {
     if(verbosity>=1) {
-      cat(paste(" [runId:",runId,"] ITERATION:",iiter," -- [2/3] Performing k-means clustering analysis in the PCA space...\n"))
+      cat(paste(" [runId:",runId,"] ITERATION:",iiter," -- [2/3] Performing k-means clustering analysis in the transformed data space...\n"))
     }
     starsPerClust <- starsPerClust_kmeans
     nclust <- round(length(ocdata_full[,1])/starsPerClust)
     if(nclust > 1) {
-      fit <- kmeans(ocdata_px[,1:4], nclust, nstart=nstarts_kmeans, iter.max=100)
+      fit <- kmeans(ocdata_px[,1:nDimsToKeep], nclust, nstart=nstarts_kmeans, iter.max=100)
       # get cluster means
       aggregate(ocdata_px, by=list(fit$cluster), FUN=mean)
       # append cluster assignment
@@ -122,7 +166,7 @@ innerLoop <- function(ocdata_full, ocdata, classAlgol="kmeans", autoThresholdLev
      stop(" Error: the selected method for the clustering in the inner loop is not implemented.")
   }
   
-  # Print PCA info and create plots -- KEPT FOR DEPURATION PURPOSES
+  # Print Dimensionality reduction info and create plots -- KEPT FOR DEPURATION PURPOSES
   if(plotIter){
     dev.new()
     par(cex=0.3)
@@ -130,7 +174,7 @@ innerLoop <- function(ocdata_full, ocdata, classAlgol="kmeans", autoThresholdLev
     pairs(ocdata_px[,1:4], pch=19, cex=0.2, col=rainbow(max(ocdata_px$resMclust.class))[ocdata_px$resMclust.class])
   }
   
-  # Merge the colors, the PCA columns and cluster classification with the original results
+  # Merge the colors, the dimensionality reduction columns and cluster classification with the original results
   ocdata_full_withColorsAndPcaCols <- data.frame(ocdata_full, ocdata, ocdata_px)
     
   # Select the classes with densities above the threshold
@@ -146,7 +190,7 @@ innerLoop <- function(ocdata_full, ocdata, classAlgol="kmeans", autoThresholdLev
   for(i in 1:max(ocdata_px$resMclust.class)) {
     dfn <- subset(ocdata_full_withColorsAndPcaCols, ocdata_full_withColorsAndPcaCols$resMclust.class==i)
         
-    if(length(dfn$x)>2) {
+    if(nrow(dfn)>2) {
       
       dif_max_mean <- kde2dForSubset(ocdata_full_withColorsAndPcaCols, setw=i, returnDistance=TRUE, showStats=FALSE, printPlots=FALSE, positionDataIndexes=positionDataIndexes)
       
@@ -183,7 +227,7 @@ innerLoop <- function(ocdata_full, ocdata, classAlgol="kmeans", autoThresholdLev
       if(is.na(round(threshold,1))) {
         cat(paste(" [runId:",runId,"] ITERATION:",iiter,"/- PROBLEM REPORT -----------------------------------------------------------------\n"))
         cat(paste(" [runId:",runId,"] ITERATION:",iiter,"| 		Class",i," has a NA value in the threshold!\n"))
-        cat(paste(" [runId:",runId,"] ITERATION:",iiter,"| 		probably due to its small number of stars: ",length(dfn$x),".\n"))
+        cat(paste(" [runId:",runId,"] ITERATION:",iiter,"| 		probably due to its small number of stars: ", nrow(dfn),".\n"))
         kde2dForSubset(ocdata_full_withColorsAndPcaCols, setw=i, returnDistance=FALSE, showStats=TRUE, printPlots=FALSE, positionDataIndexes=positionDataIndexes)
         print(dfn)
         cat(paste(" [runId:",runId,"] ITERATION:",iiter,"\\----------------------------------------------------------------------------------\n"))
@@ -211,7 +255,7 @@ innerLoop <- function(ocdata_full, ocdata, classAlgol="kmeans", autoThresholdLev
   }
   
   if(length(vclass)==0) {
-    cat(" No spatial clustering detected in the real space based on the clustered photometric data in the PCA space!\n")
+    cat(" No spatial clustering detected in the real space based on the clustered photometric data in the transformed data space!\n")
     #cat(paste(" Spatial thresholding at ",round(threshold,2), "\n")) ### ---- USED FOR DEPURATION PURPOSES
     if(stopIfEmpty) {
       stop(" No spatial clustering detected!\n Aborting cowardly!")

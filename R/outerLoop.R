@@ -40,6 +40,9 @@
 #' @param considerErrors a boolean indicating if the errors should be taken into account
 #' @param run an integer greater than zero indicating the run number
 #' @param smartTableDB a database connection to the smart look-up table
+#' @param nDimsToKeep an integer with the number of dimensions to consider (defaults to 4)
+#' @param dimRed a string with the dimensionality reduction method to use (defaults to PCA. The only other options are LaplacianEigenmaps or None)
+#' @param scale a boolean indicating if the data should be scaled and centered
 #' 
 #' @return A data frame with the id and class (member / not member) of each object at this run.
 #'
@@ -75,7 +78,8 @@
 #' photometricDataIndexes=c(3,5,7,9,11,19,21,23,25,27),
 #' photometricErrorDataIndexes=c(4,6,8,10,12,20,22,24,26,28), threshold=1, maxIter=25, 
 #' plotIter=FALSE, verbose=FALSE, starsPerClust_kmeans=50, nstarts_kmeans=50, 
-#' finalXYCut=FALSE, autoCalibrated=FALSE, considerErrors=FALSE, run=0, smartTableDB)
+#' finalXYCut=FALSE, autoCalibrated=FALSE, considerErrors=FALSE, run=0, 
+#' smartTableDB, nDimsToKeep=4, dimRed="PCA", scale=TRUE)
 #' 
 #' @author Alberto Krone-Martins, Andre Moitinho
 #' 
@@ -91,11 +95,10 @@ outerLoop <- function(ocdata_full,
 					  verbose=FALSE, starsPerClust_kmeans=50, nstarts_kmeans=50, 
 					  finalXYCut=FALSE, 
 					  autoCalibrated=FALSE, considerErrors=FALSE, run=0, 
-					  smartTableDB) {
+					  smartTableDB, nDimsToKeep=4, dimRed="PCA", scale=TRUE) {
   
+  # The version without autoThresold is deprecated
   autoThreshold <- TRUE
-  
-  #library(stats)
   
   # Create an internal index
   idx <- which(ocdata_full$field!=0)
@@ -129,11 +132,11 @@ outerLoop <- function(ocdata_full,
   }
   
   # Start iterations
-  verb <- 1
+  verb <- 2
   if(!verbose) { 
   	verb <- 0 
   }
-  ocdata_full <- data.frame(ocdata_full, id=(1:length(ocdata_full$x))) # create an id
+  ocdata_full <- data.frame(ocdata_full, id=(1:nrow(ocdata_full))) # create an id
   ocdata_out <- ocdata_full # it start as the full list
   ocdata_res <- ocdata_full # it start as the full list
   solConv <- FALSE
@@ -149,7 +152,8 @@ outerLoop <- function(ocdata_full,
                             starsPerClust_kmeans=starsPerClust_kmeans, 
                             nstarts_kmeans=nstarts_kmeans, verbosity=verb, runId=run, 
                             autoCalibrated=autoCalibrated, 
-                            positionDataIndexes=positionDataIndexes, smartTableDB=smartTableDB)
+                            positionDataIndexes=positionDataIndexes, smartTableDB=smartTableDB, 
+                            nDimsToKeep=nDimsToKeep, dimRed=dimRed, scale=scale)
     
     # Flag this iteration's cluster stars
     member <- data.frame(m=rep(0,length(ocdata_out[,1])))

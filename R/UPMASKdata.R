@@ -26,8 +26,8 @@
 #' into account arbitrary error models (the used must rewrite the 
 #' \code{\link{takeErrorsIntoAccount}} function), and it is unsupervised, data-driven, 
 #' physical-model-free and relies on as few assumptions as possible. The approach followed
-#' for membership assessment is based on an iterative process, principal component 
-#' analysis, a clustering algorithm and a kernel density estimation.
+#' for membership assessment is based on an iterative process, dimensionality reduction, 
+#' a clustering algorithm and a kernel density estimation.
 #' 
 #' @param dataTable a data frame with the data to perform the analysis
 #' @param positionDataIndexes an array of integers indicating the columns of the data frame containing the spatial position measurements
@@ -46,6 +46,9 @@
 #' @param autoCalibrated a boolean indicating if the number of random field realizations for the clustering check in the position space should be autocalibrated (experimental code, defaults to FALSE).
 #' @param considerErrors a boolean indicating if the errors should be taken into account
 #' @param finalXYCut a boolean indicating if a final cut in the XY space should be performed (defaults to FALSE)
+#' @param nDimsToKeep an integer with the number of dimensions to consider (defaults to 4)
+#' @param dimRed a string with the dimensionality reduction method to use (defaults to PCA. The only other options are LaplacianEigenmaps or None)
+#' @param scale a boolean indicating if the data should be scaled and centered
 #' 
 #' @return A data frame with the original data used to run the method and additional columns indicating the classification at each run, as well as a membership probability in the frequentist sense.
 #' 
@@ -82,7 +85,8 @@
 #' photometricErrorDataIndexes=c(4,6,8,10,12,20,22,24,26,28), threshold=1, 
 #' classAlgol="kmeans", maxIter=25, starsPerClust_kmeans=25, nstarts_kmeans=50, 
 #' nRuns=8, runInParallel=FALSE, paralelization="multicore", independent=TRUE, 
-#' verbose=FALSE, autoCalibrated=FALSE, considerErrors=FALSE, finalXYCut=FALSE)
+#' verbose=FALSE, autoCalibrated=FALSE, considerErrors=FALSE, 
+#' finalXYCut=FALSE, nDimsToKeep=4, dimRed="PCA", scale=TRUE)
 #' 
 #' @author Alberto Krone-Martins, Andre Moitinho
 #' 
@@ -90,15 +94,15 @@
 #' @import parallel
 #' @export
 #
-UPMASKdata <- function(dataTable, 
+UPMASKdata <- function(dataTable,
 					  positionDataIndexes=c(1,2),
 					  photometricDataIndexes=c(3,5,7,9,11,19,21,23,25,27),
 					  photometricErrorDataIndexes=c(4,6,8,10,12,20,22,24,26,28),
-					  threshold=1, classAlgol="kmeans", maxIter=25, 
-					  starsPerClust_kmeans=25, nstarts_kmeans=50, nRuns=8, 
-					  runInParallel=FALSE, paralelization="multicore", independent=TRUE, 
-					  verbose=FALSE, autoCalibrated=FALSE, considerErrors=FALSE, 
-					  finalXYCut=FALSE) {
+					  threshold=1, classAlgol="kmeans", maxIter=25,
+					  starsPerClust_kmeans=25, nstarts_kmeans=50, nRuns=8,
+					  runInParallel=FALSE, paralelization="multicore", independent=TRUE,
+					  verbose=FALSE, autoCalibrated=FALSE, considerErrors=FALSE,
+					  finalXYCut=FALSE, nDimsToKeep=4, dimRed="PCA", scale=TRUE) {
   
   # 
   # User :: Interface
@@ -106,7 +110,7 @@ UPMASKdata <- function(dataTable,
   if(verbose) {
     cat(paste("-------------------------------------------------------------------\n"))
     cat(      " Starting UPMASK analysis!\n")
-    cat(      " UPMASK kernels v. 1.0\n")
+    cat(      " UPMASK kernels v. 1.2\n")
     cat(paste("-------------------------------------------------------------------\n"))
   }
   
@@ -125,13 +129,18 @@ UPMASKdata <- function(dataTable,
   if (!runInParallel) {
     if(independent) {
       for(i in 1:nRuns) {
-        pp[[length(pp)+1]] <- outerLoop(dataTable, threshold=threshold,
+        pp[[length(pp)+1]] <- outerLoop(dataTable, 
+        						positionDataIndexes=positionDataIndexes,
+        						photometricDataIndexes=photometricDataIndexes, 
+        						photometricErrorDataIndexes=photometricErrorDataIndexes,
+        						threshold=threshold,
         						maxIter=maxIter, plotIter=FALSE, 
         						starsPerClust_kmeans=starsPerClust_kmeans, 
                                 nstarts_kmeans=nstarts_kmeans,  
                                 verbose=verbose, finalXYCut=finalXYCut, 
                                 autoCalibrated=autoCalibrated, 
-                                considerErrors=considerErrors, run=i, smartTableDB=stcon)
+                                considerErrors=considerErrors, run=i, 
+                    smartTableDB=stcon, nDimsToKeep=nDimsToKeep, dimRed=dimRed, scale=scale)
       }
     }
   } else {
@@ -139,14 +148,19 @@ UPMASKdata <- function(dataTable,
       # If the user wants to run in an SMP machine, then we want to use occupy the cores!
       # library(parallel)
       # Ok, now it is just a matter of running the code using a list
-      pp <- mclapply(1:nRuns, function(x) { outerLoop(dataTable, threshold=threshold, 
-                                              maxIter=maxIter, plotIter=FALSE, 
-                                              starsPerClust_kmeans=starsPerClust_kmeans, 
-                                              nstarts_kmeans=nstarts_kmeans, 
-                                              verbose=verbose, finalXYCut=finalXYCut, 
-                                              autoCalibrated=autoCalibrated, 
-                                              considerErrors=considerErrors, run=x, 
-                                              smartTableDB=stcon)} )
+      pp <- mclapply(1:nRuns, function(x) { outerLoop(dataTable, 
+        						positionDataIndexes=positionDataIndexes,
+        						photometricDataIndexes=photometricDataIndexes, 
+        						photometricErrorDataIndexes=photometricErrorDataIndexes,
+      							threshold=threshold, 
+                                maxIter=maxIter, plotIter=FALSE, 
+                                starsPerClust_kmeans=starsPerClust_kmeans, 
+                                nstarts_kmeans=nstarts_kmeans, 
+                                verbose=verbose, finalXYCut=finalXYCut, 
+                                autoCalibrated=autoCalibrated, 
+                                considerErrors=considerErrors, run=x, 
+                                smartTableDB=stcon, nDimsToKeep=nDimsToKeep, 
+      							            dimRed=dimRed, scale=scale)} )
     } else if(paralelization=="MPIcluster") {
       # if the user wants to run in a cluster
       # then we need to use MPI
@@ -170,12 +184,14 @@ UPMASKdata <- function(dataTable,
   freq <- vector("double",length(mergedResults$id))
   nConverged <- length(mergedResults)-1
   if(nConverged > 0) {
-    for(i in 1:length(mergedResults$id)) {
+#    for(i in 1:length(mergedResults$id)) {
+    for(i in 1:nrow(mergedResults)) { 
       freq[i] <- sum(mergedResults[i,2:(nConverged+1)])/nConverged
     }
     mergedResults <- cbind(mergedResults, probability=freq)
   } else {
-    for(i in 1:length(mergedResults$id)) {
+    #    for(i in 1:length(mergedResults$id)) {
+    for(i in 1:nrow(mergedResults)) { 
       freq[i] <- 0
     }
     mergedResults <- cbind(mergedResults, probability=freq)
